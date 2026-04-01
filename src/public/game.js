@@ -60,56 +60,30 @@ class Particle {
     ctx.save();
     ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
     ctx.fillStyle = this.color;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(this.x - cx, this.y - cy, this.size, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
     ctx.restore();
   }
-}
 
-// Visual Effects
-function createExplosion(x, y, color, amount) {
-  camera.shake = 10;
-  for (let i = 0; i < amount; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 200 + 50;
-    particles.push(new Particle(
-      x, y,
-      Math.cos(angle) * speed,
-      Math.sin(angle) * speed,
-      color,
-      Math.random() * 500 + 300,
-      Math.random() * 3 + 1
-    ));
-  }
-}
-
-function drawGrid(cx, cy) {
-  const gridSize = 50;
-  ctx.strokeStyle = '#1f2833';
-  ctx.lineWidth = 1;
-  
-  const startX = cx - (cx % gridSize);
-  const startY = cy - (cy % gridSize);
-
-  ctx.beginPath();
-  for (let x = startX; x < cx + width; x += gridSize) {
-    ctx.moveTo(x - cx, 0);
-    ctx.lineTo(x - cx, height);
-  }
-  for (let y = startY; y < cy + height; y += gridSize) {
-    ctx.moveTo(0, y - cy);
-    ctx.lineTo(width, y - cy);
-  }
-  ctx.stroke();
-
-  // Draw world bounds
+  // Draw world bounds (thick caution tape style border)
   if (config.width) {
-    ctx.strokeStyle = '#c5c6c7';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(-cx, -cy, config.width, config.height);
+    const bw = 10;
+    ctx.strokeStyle = '#eab308'; // yellow
+    ctx.lineWidth = bw;
+    ctx.strokeRect(-cx - bw/2, -cy - bw/2, config.width + bw, config.height + bw);
+
+    // Black dashes over yellow line for caution stripe look
+    ctx.strokeStyle = '#000000';
+    ctx.setLineDash([20, 20]);
+    ctx.strokeRect(-cx - bw/2, -cy - bw/2, config.width + bw, config.height + bw);
+    ctx.setLineDash([]);
   }
 }
+
 
 // Input handling
 const keys = { w: false, a: false, s: false, d: false };
@@ -238,22 +212,19 @@ function render() {
 
   // Draw Bots
   serverState.bots.forEach(b => {
-    // Body
-    ctx.fillStyle = '#c5c6c7';
-    ctx.beginPath();
-    ctx.arc(b.x - camera.x, b.y - camera.y, b.radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Eye (points forward)
-    const angle = Math.atan2(b.vy, b.vx);
-    ctx.fillStyle = '#0b0c10';
-    ctx.beginPath();
-    ctx.arc(b.x - camera.x + Math.cos(angle) * b.radius * 0.5, b.y - camera.y + Math.sin(angle) * b.radius * 0.5, b.radius * 0.3, 0, Math.PI * 2);
-    ctx.fill();
+    const botAngle = Math.atan2(b.vy, b.vx);
+    drawCrewmate(ctx, b.x - camera.x, b.y - camera.y, b.radius, '#c5c6c7', botAngle, true);
 
     // Health
     ctx.fillStyle = '#e76f51';
-    ctx.fillRect(b.x - camera.x - b.radius, b.y - camera.y - b.radius - 10, (b.radius * 2) * (b.health/100), 4);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    const hpW = b.radius * 2.5;
+    const hpH = 8;
+    const hpX = b.x - camera.x - hpW/2;
+    const hpY = b.y - camera.y - b.radius * 2.2;
+    ctx.strokeRect(hpX, hpY, hpW, hpH);
+    ctx.fillRect(hpX, hpY, hpW * (b.health/100), hpH);
   });
 
   // Draw Players
@@ -261,51 +232,48 @@ function render() {
     const p = serverState.players[id];
     const isMe = id === myId;
 
-    // Body
-    ctx.fillStyle = isMe ? '#66fcf1' : '#45a29e';
-    
-    // Draw polygon instead of circle for players
-    ctx.save();
-    ctx.translate(p.x - camera.x, p.y - camera.y);
     const aimAngle = Math.atan2(p.targetY - p.y, p.targetX - p.x);
-    ctx.rotate(aimAngle);
-
-    ctx.beginPath();
-    ctx.moveTo(p.radius, 0); // nose
-    ctx.lineTo(-p.radius, -p.radius * 0.8);
-    ctx.lineTo(-p.radius * 0.5, 0);
-    ctx.lineTo(-p.radius, p.radius * 0.8);
-    ctx.closePath();
-    ctx.fill();
-
-    // Outline
-    ctx.strokeStyle = '#c5c6c7';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.restore();
+    // Use bright distinct colors
+    const color = isMe ? '#e62429' : (p.color || '#3b82f6');
+    drawCrewmate(ctx, p.x - camera.x, p.y - camera.y, p.radius, color, aimAngle, false);
 
     // Name tag
-    ctx.fillStyle = '#c5c6c7';
-    ctx.font = '12px Orbitron';
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.font = 'bold 16px Arial'; // more legible cartoon font
     ctx.textAlign = 'center';
-    ctx.fillText(p.username, p.x - camera.x, p.y - camera.y - p.radius - 15);
+    const nameY = p.y - camera.y - p.radius * 2.2;
+    ctx.strokeText(p.username, p.x - camera.x, nameY);
+    ctx.fillText(p.username, p.x - camera.x, nameY);
   }
 
   // Draw Projectiles
   serverState.projectiles.forEach(proj => {
-    ctx.fillStyle = proj.ownerType === 'player' ? '#66fcf1' : '#e76f51';
-    
-    // Add small particle trail
-    if (Math.random() > 0.5) {
-      particles.push(new Particle(proj.x, proj.y, -proj.vx*0.2, -proj.vy*0.2, ctx.fillStyle, 150, 2));
+    // bright yellow/orange bullet
+    ctx.fillStyle = proj.ownerType === 'player' ? '#fbbf24' : '#ef4444';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+
+    // Chunkier particle trail
+    if (Math.random() > 0.6) {
+      particles.push(new Particle(proj.x, proj.y, -proj.vx*0.2, -proj.vy*0.2, '#ffffff', 200, 3));
     }
 
     ctx.save();
     ctx.translate(proj.x - camera.x, proj.y - camera.y);
     const angle = Math.atan2(proj.vy, proj.vx);
     ctx.rotate(angle);
-    ctx.fillRect(-10, -2, 20, 4);
+
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(-10, -4, 20, 8, 4);
+    } else {
+      ctx.rect(-10, -4, 20, 8);
+    }
+    ctx.fill();
+    ctx.stroke();
+
     ctx.restore();
   });
 }
