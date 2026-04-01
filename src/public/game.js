@@ -189,11 +189,13 @@ function drawCrewmate(ctx, x, y, radius, color, aimAngle, isBot = false) {
   ctx.restore();
 }
 
+
 function drawGrid(cx, cy) {
   const gridSize = 100; // bigger tiles for floor
   ctx.strokeStyle = '#222';
   ctx.lineWidth = 2;
   
+
   const startX = cx - (cx % gridSize);
   const startY = cy - (cy % gridSize);
 
@@ -230,6 +232,7 @@ function drawGrid(cx, cy) {
     ctx.strokeStyle = '#eab308'; // yellow
     ctx.lineWidth = bw;
     ctx.strokeRect(-cx - bw/2, -cy - bw/2, config.width + bw, config.height + bw);
+
 
     // Black dashes over yellow line for caution stripe look
     ctx.strokeStyle = '#000000';
@@ -289,6 +292,7 @@ function drawGrid(cx, cy) {
     ctx.setLineDash([]);
   }
 }
+
 
 function createExplosion(x, y, color, amount) {
   camera.shake = 15; // slightly more shake
@@ -386,6 +390,7 @@ function update(dt) {
   if (keys.d) dx += 1;
 
 
+
   if (keys[' '] && !mouse.dashedThisPress) {
     socket.emit('dash');
     mouse.dashedThisPress = true; // prevent holding space
@@ -412,6 +417,7 @@ function update(dt) {
     particles[i].update(dt);
     if (particles[i].life <= 0) particles.splice(i, 1);
   }
+
 
 
   // Update UI Dash Cooldown
@@ -512,6 +518,7 @@ function render() {
 
     // Health
     ctx.fillStyle = '#ef4444';
+
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 2;
     const hpW = b.radius * 2.5;
@@ -529,6 +536,7 @@ function render() {
       ctx.strokeRect(hpX, hpY, hpW, hpH);
       ctx.fillRect(hpX, hpY, hpW * (b.health/b.maxHealth), hpH);
     }
+
   });
 
   // Draw Players
@@ -549,6 +557,7 @@ function render() {
     ctx.font = 'bold 16px "Fredoka One", sans-serif';
     ctx.textAlign = 'center';
     const nameY = p.y - camera.y - p.radius * 2.5;
+
     ctx.strokeText(p.username, p.x - camera.x, nameY);
     ctx.fillText(p.username, p.x - camera.x, nameY);
   }
@@ -557,6 +566,7 @@ function render() {
   serverState.projectiles.forEach(proj => {
     // bright yellow/orange bullet
     ctx.fillStyle = proj.ownerType === 'player' ? '#fbbf24' : '#ef4444';
+
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 3;
 
@@ -570,6 +580,7 @@ function render() {
     const angle = Math.atan2(proj.vy, proj.vx);
     ctx.rotate(angle);
 
+
     ctx.beginPath();
     if (ctx.roundRect) {
       ctx.roundRect(-10, -4, 20, 8, 4);
@@ -578,6 +589,7 @@ function render() {
     }
     ctx.fill();
     ctx.stroke();
+
 
     ctx.restore();
   });

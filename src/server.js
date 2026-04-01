@@ -99,7 +99,6 @@ function createBot() {
   let speed = config.botSpeed;
   let maxHealth = 100;
   let attackType = 'shoot';
-
   if (typeRoll < 0.3) {
     botType = 'melee';
     speed = config.botSpeed * 1.5;
@@ -171,7 +170,6 @@ io.on('connection', (socket) => {
   socket.on('join', async (username) => {
     const user = await loadOrCreateUser(username);
     
-
     const team = getRandomTeam();
     players[socket.id] = {
       id: socket.id,
@@ -222,7 +220,6 @@ io.on('connection', (socket) => {
     p.targetY = data.mouseY;
   });
 
-
   socket.on('dash', () => {
     if (!players[socket.id]) return;
     const p = players[socket.id];
@@ -234,7 +231,6 @@ io.on('connection', (socket) => {
     // Calculate current movement direction (or aim direction if not moving)
     let mag = Math.hypot(p.vx, p.vy);
     let dirX = 0, dirY = 0;
-
     if (mag > 0) {
       dirX = p.vx / mag;
       dirY = p.vy / mag;
@@ -244,12 +240,10 @@ io.on('connection', (socket) => {
       dirX = Math.cos(aimAngle);
       dirY = Math.sin(aimAngle);
     }
-
     // Apply huge velocity burst that will naturally decay over a few frames
     // To make it easy, we just apply a massive speed for one frame
     p.x += dirX * 300;
     p.y += dirY * 300;
-
     // Check bounds & obstacles immediately so they don't dash out of map
     p.x = Math.max(p.radius, Math.min(config.width - p.radius, p.x));
     p.y = Math.max(p.radius, Math.min(config.height - p.radius, p.y));
@@ -260,7 +254,6 @@ io.on('connection', (socket) => {
          p.y = col.resolveY;
       }
     }
-
     p.lastDashed = now;
   });
 
@@ -271,7 +264,6 @@ io.on('connection', (socket) => {
 
     if (now - p.lastFired < config.fireCooldown) return;
     p.lastFired = now;
-
 
     const angle = Math.atan2(data.mouseY - p.y, data.mouseX - p.x);
     projectiles.push({
@@ -324,7 +316,6 @@ function circleRectCollide(cx, cy, radius, rx, ry, rw, rh) {
     // Resolve collision
     const overlap = radius - distance;
     if (distance === 0) return { hit: false }; // Center of circle exactly on edge, ignore
-
     return {
       hit: true,
       resolveX: cx + (distX / distance) * overlap,
@@ -346,7 +337,6 @@ setInterval(() => {
     p.x += p.vx * dt;
     p.y += p.vy * dt;
 
-
     p.x = Math.max(p.radius, Math.min(config.width - p.radius, p.x));
     p.y = Math.max(p.radius, Math.min(config.height - p.radius, p.y));
 
@@ -365,7 +355,6 @@ setInterval(() => {
   bots.forEach(b => {
     b.x += b.vx * dt;
     b.y += b.vy * dt;
-
 
     if (b.x <= b.radius || b.x >= config.width - b.radius) b.vx *= -1;
     if (b.y <= b.radius || b.y >= config.height - b.radius) b.vy *= -1;
@@ -389,23 +378,73 @@ setInterval(() => {
       if (dist < closestDist) {
         closestDist = dist;
         closestPlayer = p;
+>>>>>>> origin/main
       }
     }
 
-    if (closestPlayer && now - b.lastFired > 1500) {
-      b.lastFired = now;
-      const angle = Math.atan2(closestPlayer.y - b.y, closestPlayer.x - b.x);
-      projectiles.push({
-        id: generateId(),
-        ownerId: b.id,
-        ownerType: 'bot',
-        x: b.x,
-        y: b.y,
-        vx: Math.cos(angle) * config.projectileSpeed * 0.4,
-        vy: Math.sin(angle) * config.projectileSpeed * 0.4,
-        life: 2000,
-        born: now
-      });
+
+    let closestEnemy = null;
+    let closestDist = b.botType === 'melee' ? 1500 : 800;
+
+    // Find enemy players
+    for (const pid in players) {
+      const p = players[pid];
+      if (p.team === b.team) continue; // Don't target teammates
+      const dist = Math.hypot(p.x - b.x, p.y - b.y);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestEnemy = p;
+      }
+    }
+
+    // Find enemy bots
+    bots.forEach(otherBot => {
+      if (otherBot.id === b.id || otherBot.team === b.team) return;
+      const dist = Math.hypot(otherBot.x - b.x, otherBot.y - b.y);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestEnemy = otherBot;
+      }
+    });
+
+    if (closestEnemy) {
+      // Move towards enemy if melee
+      if (b.botType === 'melee') {
+        const angle = Math.atan2(closestEnemy.y - b.y, closestEnemy.x - b.x);
+        b.vx = Math.cos(angle) * b.speed;
+        b.vy = Math.sin(angle) * b.speed;
+
+        // Melee attack logic
+        if (closestDist < b.radius + closestEnemy.radius + 10 && now - b.lastFired > 1000) {
+           b.lastFired = now;
+           closestEnemy.health -= 30; // Instant damage
+        }
+      } else {
+        // Ranged attacks
+        if (now - b.lastFired > (b.botType === 'heavy' ? 2000 : 1500)) {
+          b.lastFired = now;
+          const angle = Math.atan2(closestEnemy.y - b.y, closestEnemy.x - b.x);
+
+          if (b.botType === 'heavy') {
+            // Shotgun (3 pellets)
+            for (let i = -1; i <= 1; i++) {
+              const spread = angle + (i * 0.2);
+              projectiles.push({
+                id: generateId(), ownerId: b.id, ownerType: 'bot', ownerTeam: b.team,
+                x: b.x, y: b.y, vx: Math.cos(spread) * config.projectileSpeed * 0.6, vy: Math.sin(spread) * config.projectileSpeed * 0.6,
+                life: 1500, born: now
+              });
+            }
+          } else {
+            // Standard
+            projectiles.push({
+              id: generateId(), ownerId: b.id, ownerType: 'bot', ownerTeam: b.team,
+              x: b.x, y: b.y, vx: Math.cos(angle) * config.projectileSpeed * 0.4, vy: Math.sin(angle) * config.projectileSpeed * 0.4,
+              life: 2000, born: now
+            });
+          }
+        }
+      }
     }
   });
 
@@ -418,7 +457,6 @@ setInterval(() => {
     let hit = false;
     let removeProj = false;
 
-
     // Projectile vs Bots
     for (let j = bots.length - 1; j >= 0; j--) {
       const b = bots[j];
@@ -427,7 +465,6 @@ setInterval(() => {
         b.health -= (proj.ownerType === 'player' ? 50 : 35); // Bots do less damage to bots
         hit = true;
         removeProj = true;
-
         if (b.health <= 0) {
           bots.splice(j, 1);
           if (proj.ownerType === 'player' && players[proj.ownerId]) {
@@ -435,7 +472,6 @@ setInterval(() => {
             players[proj.ownerId].score += 10;
             io.emit('killEvent', { killer: proj.ownerId, victim: 'bot', x: b.x, y: b.y });
           }
-
           setTimeout(() => { bots.push(createBot()); }, 3000);
         }
         break;
@@ -448,7 +484,6 @@ setInterval(() => {
         if (pid === proj.ownerId) continue;
         const p = players[pid];
         if (proj.ownerTeam === p.team) continue; // Friendly fire off
-
         if (Math.hypot(proj.x - p.x, proj.y - p.y) < p.radius + 10) {
           p.health -= 20;
           hit = true;
