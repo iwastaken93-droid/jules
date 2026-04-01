@@ -1,4 +1,8 @@
+const fs = require('fs');
+const path = 'src/public/style.css';
+let content = fs.readFileSync(path, 'utf8');
 
+const newCSS = `
 @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
 
 body, html {
@@ -162,3 +166,7 @@ button:active {
   border-bottom: 2px dashed #94a3b8;
   padding-bottom: 4px;
 }
+`;
+
+fs.writeFileSync(path, newCSS, 'utf8');
+console.log('css patched');
