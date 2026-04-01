@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geometry Deathmatch</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="login-screen">
+    <div class="login-box">
+      <h1>Geometry Deathmatch</h1>
+      <p>Enter your username to play</p>
+      <input type="text" id="username" placeholder="Username" maxlength="15" autocomplete="off">
+      <button id="join-btn">Join Arena</button>
+    </div>
+  </div>
+
+  <div id="game-ui" style="display: none;">
+    <div id="stats">
+      Score: <span id="ui-score">0</span> | 
+      Kills: <span id="ui-kills">0</span> | 
+      Deaths: <span id="ui-deaths">0</span>
+    </div>
+    <div id="health-bar-container">
+      <div id="health-bar"></div>
+    </div>
+    <div id="leaderboard">
+      <h3>Top Players</h3>
+      <ul id="leaderboard-list"></ul>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
