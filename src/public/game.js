@@ -25,6 +25,7 @@ const uiScore = document.getElementById('ui-score');
 const uiKills = document.getElementById('ui-kills');
 const uiDeaths = document.getElementById('ui-deaths');
 const healthBar = document.getElementById('health-bar');
+const dashBar = document.getElementById('dash-bar');
 const leaderboardList = document.getElementById('leaderboard-list');
 
 let myId = null;
@@ -60,37 +61,145 @@ class Particle {
     ctx.save();
     ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
     ctx.fillStyle = this.color;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(this.x - cx, this.y - cy, this.size, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
     ctx.restore();
   }
 }
 
 // Visual Effects
-function createExplosion(x, y, color, amount) {
-  camera.shake = 10;
-  for (let i = 0; i < amount; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 200 + 50;
-    particles.push(new Particle(
-      x, y,
-      Math.cos(angle) * speed,
-      Math.sin(angle) * speed,
-      color,
-      Math.random() * 500 + 300,
-      Math.random() * 3 + 1
-    ));
+
+function drawCrewmate(ctx, x, y, radius, color, aimAngle, isBot = false) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Determine direction based on aimAngle
+  // -PI/2 to PI/2 is facing right
+  const facingRight = Math.abs(aimAngle) < Math.PI / 2;
+  const flip = facingRight ? 1 : -1;
+
+  ctx.scale(flip, 1);
+
+  const w = radius * 1.5;
+  const h = radius * 1.8;
+  const bw = 4; // border width
+
+  // Set styles
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = bw;
+  ctx.lineJoin = 'round';
+
+  // Draw Backpack
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(-w*0.8, -h*0.3, w*0.4, h*0.8, w*0.2);
+  } else {
+    ctx.rect(-w*0.8, -h*0.3, w*0.4, h*0.8); // fallback
   }
+  ctx.fill();
+  ctx.stroke();
+
+  // Draw Legs
+  // Back leg
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(-w*0.3, h*0.2, w*0.35, h*0.7, w*0.15);
+  } else {
+    ctx.rect(-w*0.3, h*0.2, w*0.35, h*0.7);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Front leg
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(w*0.1, h*0.2, w*0.35, h*0.7, w*0.15);
+  } else {
+    ctx.rect(w*0.1, h*0.2, w*0.35, h*0.7);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Main Body
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(-w*0.5, -h*0.8, w*1.1, h*1.4, w*0.5);
+  } else {
+    ctx.rect(-w*0.5, -h*0.8, w*1.1, h*1.4);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Visor
+  ctx.fillStyle = '#9bd8e0'; // Light blue visor
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(w*0.1, -h*0.5, w*0.8, h*0.5, h*0.25);
+  } else {
+    ctx.rect(w*0.1, -h*0.5, w*0.8, h*0.5);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Visor highlight
+  ctx.fillStyle = '#e1f4f6';
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(w*0.3, -h*0.4, w*0.4, h*0.15, h*0.1);
+  } else {
+    ctx.rect(w*0.3, -h*0.4, w*0.4, h*0.15);
+  }
+  ctx.fill();
+
+  ctx.restore();
+
+  // Draw floating hand/gun pointing exactly at target
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(aimAngle);
+
+  // Hand distance from center
+  const handDist = radius * 1.5;
+
+  // Gun barrel
+  ctx.fillStyle = '#444';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = bw;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(handDist + radius*0.2, -radius*0.3, radius, radius*0.6, 2);
+  } else {
+    ctx.rect(handDist + radius*0.2, -radius*0.3, radius, radius*0.6);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Hand (circle holding gun)
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(handDist, 0, radius * 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 function drawGrid(cx, cy) {
-  const gridSize = 50;
-  ctx.strokeStyle = '#1f2833';
-  ctx.lineWidth = 1;
+  const gridSize = 100; // bigger tiles for floor
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 2;
   
   const startX = cx - (cx % gridSize);
   const startY = cy - (cy % gridSize);
+
+  // Draw floor tiles
+  ctx.fillStyle = '#4a5568'; // metallic blue-grey
+  ctx.fillRect(0, 0, width, height);
 
   ctx.beginPath();
   for (let x = startX; x < cx + width; x += gridSize) {
@@ -103,16 +212,53 @@ function drawGrid(cx, cy) {
   }
   ctx.stroke();
 
-  // Draw world bounds
+  // Draw some simple tile details (rivets/crosses) to look like a spaceship floor
+  ctx.fillStyle = '#2d3748';
+  for (let x = startX; x < cx + width; x += gridSize) {
+    for (let y = startY; y < cy + height; y += gridSize) {
+      // Small dots in corners
+      ctx.fillRect(x - cx + 5, y - cy + 5, 4, 4);
+      ctx.fillRect(x - cx + gridSize - 9, y - cy + 5, 4, 4);
+      ctx.fillRect(x - cx + 5, y - cy + gridSize - 9, 4, 4);
+      ctx.fillRect(x - cx + gridSize - 9, y - cy + gridSize - 9, 4, 4);
+    }
+  }
+
+  // Draw world bounds (thick caution tape style border)
   if (config.width) {
-    ctx.strokeStyle = '#c5c6c7';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(-cx, -cy, config.width, config.height);
+    const bw = 10;
+    ctx.strokeStyle = '#eab308'; // yellow
+    ctx.lineWidth = bw;
+    ctx.strokeRect(-cx - bw/2, -cy - bw/2, config.width + bw, config.height + bw);
+
+    // Black dashes over yellow line for caution stripe look
+    ctx.strokeStyle = '#000000';
+    ctx.setLineDash([20, 20]);
+    ctx.strokeRect(-cx - bw/2, -cy - bw/2, config.width + bw, config.height + bw);
+    ctx.setLineDash([]);
   }
 }
 
+function createExplosion(x, y, color, amount) {
+  camera.shake = 15; // slightly more shake
+  for (let i = 0; i < amount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 250 + 100;
+    particles.push(new Particle(
+      x, y,
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed,
+      color,
+      Math.random() * 400 + 200, // slightly shorter life, punchier
+      Math.random() * 6 + 4      // chunkier pieces
+    ));
+  }
+}
+
+
+
 // Input handling
-const keys = { w: false, a: false, s: false, d: false };
+const keys = { w: false, a: false, s: false, d: false, ' ': false };
 const mouse = { x: 0, y: 0, down: false };
 
 window.addEventListener('keydown', e => {
@@ -188,6 +334,15 @@ function update(dt) {
   if (keys.a) dx -= 1;
   if (keys.d) dx += 1;
 
+
+  if (keys[' '] && !mouse.dashedThisPress) {
+    socket.emit('dash');
+    mouse.dashedThisPress = true; // prevent holding space
+  }
+  if (!keys[' ']) {
+    mouse.dashedThisPress = false;
+  }
+
   socket.emit('input', {
     dx, dy,
     mouseX: camera.x + mouse.x,
@@ -205,6 +360,16 @@ function update(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update(dt);
     if (particles[i].life <= 0) particles.splice(i, 1);
+  }
+
+
+  // Update UI Dash Cooldown
+  const now = Date.now();
+  const timeSinceDash = now - (me.lastDashed || 0);
+  const dashPct = Math.min(100, (timeSinceDash / 3000) * 100);
+  if (dashBar) {
+    dashBar.style.width = dashPct + '%';
+    dashBar.style.backgroundColor = dashPct >= 100 ? '#fbbf24' : '#94a3b8'; // yellow when ready
   }
 
   // Update UI
@@ -236,24 +401,83 @@ function render() {
   // Draw particles (underneath players)
   particles.forEach(p => p.draw(ctx, camera.x, camera.y));
 
+
+  // Draw particles (underneath players)
+  particles.forEach(p => p.draw(ctx, camera.x, camera.y));
+
+  // Draw Obstacles (Space Crates)
+  if (config.obstacles) {
+    config.obstacles.forEach(obs => {
+      ctx.fillStyle = '#64748b'; // metal crate color
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+
+      const ox = obs.x - camera.x;
+      const oy = obs.y - camera.y;
+
+      // Base crate
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(ox, oy, obs.w, obs.h, 8);
+      } else {
+        ctx.rect(ox, oy, obs.w, obs.h);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      // Crate details (X mark across it)
+      ctx.beginPath();
+      ctx.moveTo(ox + 8, oy + 8);
+      ctx.lineTo(ox + obs.w - 8, oy + obs.h - 8);
+      ctx.moveTo(ox + obs.w - 8, oy + 8);
+      ctx.lineTo(ox + 8, oy + obs.h - 8);
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+    });
+  }
+
+
   // Draw Bots
   serverState.bots.forEach(b => {
-    // Body
-    ctx.fillStyle = '#c5c6c7';
-    ctx.beginPath();
-    ctx.arc(b.x - camera.x, b.y - camera.y, b.radius, 0, Math.PI * 2);
-    ctx.fill();
+    const botAngle = Math.atan2(b.vy, b.vx);
+    let color = b.team === 'red' ? '#ef4444' : b.team === 'blue' ? '#3b82f6' : b.team === 'green' ? '#22c55e' : '#eab308';
 
-    // Eye (points forward)
-    const angle = Math.atan2(b.vy, b.vx);
-    ctx.fillStyle = '#0b0c10';
-    ctx.beginPath();
-    ctx.arc(b.x - camera.x + Math.cos(angle) * b.radius * 0.5, b.y - camera.y + Math.sin(angle) * b.radius * 0.5, b.radius * 0.3, 0, Math.PI * 2);
-    ctx.fill();
+    // Different visuals for bot types
+    if (b.botType === 'heavy') color = '#94a3b8'; // Grey tank
+    if (b.botType === 'melee') color = '#fbbf24'; // Fast yellow
+
+    drawCrewmate(ctx, b.x - camera.x, b.y - camera.y, b.radius, color, botAngle, true);
+
+    // Name tag
+    ctx.fillStyle = color;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.font = 'bold 12px "Fredoka One", sans-serif';
+    ctx.textAlign = 'center';
+    const nameY = b.y - camera.y - b.radius * 2.5;
+    ctx.strokeText(b.username, b.x - camera.x, nameY);
+    ctx.fillText(b.username, b.x - camera.x, nameY);
 
     // Health
-    ctx.fillStyle = '#e76f51';
-    ctx.fillRect(b.x - camera.x - b.radius, b.y - camera.y - b.radius - 10, (b.radius * 2) * (b.health/100), 4);
+    ctx.fillStyle = '#ef4444';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    const hpW = b.radius * 2.5;
+    const hpH = 8;
+    const hpX = b.x - camera.x - hpW/2;
+    const hpY = b.y - camera.y - b.radius * 2.2;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(hpX, hpY, hpW, hpH, 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect(hpX, hpY, hpW * (b.health/b.maxHealth), hpH, 2);
+      ctx.fill();
+    } else {
+      ctx.strokeRect(hpX, hpY, hpW, hpH);
+      ctx.fillRect(hpX, hpY, hpW * (b.health/b.maxHealth), hpH);
+    }
   });
 
   // Draw Players
@@ -261,51 +485,49 @@ function render() {
     const p = serverState.players[id];
     const isMe = id === myId;
 
-    // Body
-    ctx.fillStyle = isMe ? '#66fcf1' : '#45a29e';
-    
-    // Draw polygon instead of circle for players
-    ctx.save();
-    ctx.translate(p.x - camera.x, p.y - camera.y);
     const aimAngle = Math.atan2(p.targetY - p.y, p.targetX - p.x);
-    ctx.rotate(aimAngle);
-
-    ctx.beginPath();
-    ctx.moveTo(p.radius, 0); // nose
-    ctx.lineTo(-p.radius, -p.radius * 0.8);
-    ctx.lineTo(-p.radius * 0.5, 0);
-    ctx.lineTo(-p.radius, p.radius * 0.8);
-    ctx.closePath();
-    ctx.fill();
-
-    // Outline
-    ctx.strokeStyle = '#c5c6c7';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.restore();
+    // Use team colors
+    let teamColor = p.team === 'red' ? '#ef4444' : p.team === 'blue' ? '#3b82f6' : p.team === 'green' ? '#22c55e' : '#eab308';
+    const color = isMe ? '#ffffff' : teamColor; // Me is white so you stand out
+    drawCrewmate(ctx, p.x - camera.x, p.y - camera.y, p.radius, color, aimAngle, false);
 
     // Name tag
-    ctx.fillStyle = '#c5c6c7';
-    ctx.font = '12px Orbitron';
+    ctx.fillStyle = teamColor;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.font = 'bold 16px "Fredoka One", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.username, p.x - camera.x, p.y - camera.y - p.radius - 15);
+    const nameY = p.y - camera.y - p.radius * 2.5;
+    ctx.strokeText(p.username, p.x - camera.x, nameY);
+    ctx.fillText(p.username, p.x - camera.x, nameY);
   }
 
   // Draw Projectiles
   serverState.projectiles.forEach(proj => {
-    ctx.fillStyle = proj.ownerType === 'player' ? '#66fcf1' : '#e76f51';
-    
-    // Add small particle trail
-    if (Math.random() > 0.5) {
-      particles.push(new Particle(proj.x, proj.y, -proj.vx*0.2, -proj.vy*0.2, ctx.fillStyle, 150, 2));
+    // bright yellow/orange bullet
+    ctx.fillStyle = proj.ownerType === 'player' ? '#fbbf24' : '#ef4444';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+
+    // Chunkier particle trail
+    if (Math.random() > 0.6) {
+      particles.push(new Particle(proj.x, proj.y, -proj.vx*0.2, -proj.vy*0.2, '#ffffff', 200, 3));
     }
 
     ctx.save();
     ctx.translate(proj.x - camera.x, proj.y - camera.y);
     const angle = Math.atan2(proj.vy, proj.vx);
     ctx.rotate(angle);
-    ctx.fillRect(-10, -2, 20, 4);
+
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(-10, -4, 20, 8, 4);
+    } else {
+      ctx.rect(-10, -4, 20, 8);
+    }
+    ctx.fill();
+    ctx.stroke();
+
     ctx.restore();
   });
 }
